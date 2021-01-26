@@ -3,11 +3,11 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion rootProject.ext.compileSdkVersion
+    compileSdkVersion 30
     defaultConfig {
         applicationId "pl.snowdog.kiosk"
-        minSdkVersion 23
-        targetSdkVersion 29
+        minSdkVersion 25
+        targetSdkVersion 30
         versionCode 3
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"

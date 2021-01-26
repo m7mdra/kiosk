@@ -7,11 +7,14 @@ import android.content.*
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageInstaller.SessionParams
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.os.UserManager
 import android.provider.Settings
 import android.support.v7.app.AppCompatActivity
+import android.view.KeyEvent
 import android.view.View
+import android.view.WindowInsets
 import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_main.*
 
@@ -70,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         setImmersiveMode(enable)
     }
 
+
     // region restrictions
     private fun setRestrictions(disallow: Boolean) {
         setUserRestriction(UserManager.DISALLOW_SAFE_BOOT, disallow)
@@ -77,7 +81,19 @@ class MainActivity : AppCompatActivity() {
         setUserRestriction(UserManager.DISALLOW_ADD_USER, disallow)
         setUserRestriction(UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA, disallow)
         setUserRestriction(UserManager.DISALLOW_ADJUST_VOLUME, disallow)
-        mDevicePolicyManager.setStatusBarDisabled(mAdminComponentName, disallow)
+        setUserRestriction(UserManager.DISALLOW_CONFIG_WIFI, false)
+        setUserRestriction(UserManager.DISALLOW_AIRPLANE_MODE, disallow)
+        setUserRestriction(UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS, disallow)
+        setUserRestriction(UserManager.DISALLOW_UNINSTALL_APPS, disallow)
+        mDevicePolicyManager.setStatusBarDisabled(mAdminComponentName, false)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            mDevicePolicyManager.setLockTaskFeatures(
+                    mAdminComponentName,
+                    DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
+                            DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
+                            DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
+        }
 
     }
 
@@ -137,20 +153,41 @@ class MainActivity : AppCompatActivity() {
         mDevicePolicyManager.setKeyguardDisabled(mAdminComponentName, !enable)
     }
 
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        return false
+    }
+
     private fun setImmersiveMode(enable: Boolean) {
         if (enable) {
-            val flags = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
-            window.decorView.systemUiVisibility = flags
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val insetsController = window.insetsController
+                insetsController?.hide(WindowInsets.Type.systemBars() or
+                        WindowInsets.Type.systemGestures() or
+                        WindowInsets.Type.mandatorySystemGestures()
+                )
+            } else {
+                val flags = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+                window.decorView.systemUiVisibility = flags
+            }
         } else {
-            val flags = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
-            window.decorView.systemUiVisibility = flags
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+
+                val insetsController = window.insetsController
+                insetsController?.show(WindowInsets.Type.systemBars() or
+                        WindowInsets.Type.systemGestures() or
+                        WindowInsets.Type.mandatorySystemGestures()
+                )
+            } else {
+                val flags = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)
+                window.decorView.systemUiVisibility = flags
+            }
         }
     }
 
