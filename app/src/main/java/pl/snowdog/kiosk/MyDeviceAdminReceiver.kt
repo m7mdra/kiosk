@@ -17,11 +17,12 @@ class MyDeviceAdminReceiver : DeviceAdminReceiver() {
 
     override fun onLockTaskModeEntering(context: Context, intent: Intent, pkg: String) {
         super.onLockTaskModeEntering(context, intent, pkg)
-        Log.d(TAG, "onLockTaskModeEntering")
+        //request permissions , location, contact etc.
     }
 
     override fun onLockTaskModeExiting(context: Context, intent: Intent) {
         super.onLockTaskModeExiting(context, intent)
-        Log.d(TAG, "onLockTaskModeExiting")
+        //remove permissions , location, contact etc.
+
     }
 }

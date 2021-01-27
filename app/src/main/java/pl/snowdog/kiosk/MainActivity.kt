@@ -117,7 +117,7 @@ class MainActivity : AppCompatActivity() {
     private fun setLockTask(start: Boolean, isAdmin: Boolean) {
         if (isAdmin) {
             mDevicePolicyManager.setLockTaskPackages(
-                    mAdminComponentName, if (start) arrayOf(packageName) else arrayOf())
+                    mAdminComponentName, if (start) arrayOf(packageName,"com.mrugas.smallapp") else arrayOf())
         }
         if (start) {
             startLockTask()
