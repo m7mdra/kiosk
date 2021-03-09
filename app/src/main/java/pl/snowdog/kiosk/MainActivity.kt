@@ -1,17 +1,27 @@
 package pl.snowdog.kiosk
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.admin.DevicePolicyManager
+import android.app.admin.DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED
 import android.app.admin.SystemUpdatePolicy
 import android.content.*
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageInstaller.SessionParams
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.UserManager
 import android.provider.Settings
 import android.support.v7.app.AppCompatActivity
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
@@ -20,22 +30,43 @@ import kotlinx.android.synthetic.main.activity_main.*
 
 
 class MainActivity : AppCompatActivity() {
+    inner class BatteryBroadcastReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context?, batteryStatus: Intent?) {
+            val status: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging: Boolean = status == BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == BatteryManager.BATTERY_STATUS_FULL
 
-    private lateinit var mAdminComponentName: ComponentName
-    private lateinit var mDevicePolicyManager: DevicePolicyManager
+
+            val chargePlug: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+            val usbCharge: Boolean = chargePlug == BatteryManager.BATTERY_PLUGGED_USB
+            val acCharge: Boolean = chargePlug == BatteryManager.BATTERY_PLUGGED_AC
+            print("Status: $status")
+            print("isCharging?: $isCharging ")
+
+        }
+
+    }
+
+    private lateinit var adminComponentName: ComponentName
+    private lateinit var devicePolicyManager: DevicePolicyManager
 
     companion object {
         const val LOCK_ACTIVITY_KEY = "pl.snowdog.kiosk.MainActivity"
     }
 
+    fun Any.log() {
+        Log.d("MEGA", "$this")
+    }
+
+
+    @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        adminComponentName = MyDeviceAdminReceiver.getComponentName(this)
+        devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
 
-        mAdminComponentName = MyDeviceAdminReceiver.getComponentName(this)
-        mDevicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-
-        mDevicePolicyManager.removeActiveAdmin(mAdminComponentName)
+        devicePolicyManager.removeActiveAdmin(adminComponentName)
 
         val isAdmin = isAdmin()
         if (isAdmin) {
@@ -43,8 +74,30 @@ class MainActivity : AppCompatActivity() {
         } else {
             Toast.makeText(applicationContext, R.string.not_device_owner, Toast.LENGTH_SHORT).show()
         }
+        btnShowNotification.setOnClickListener {
+            showNotification()
+        }
         btStartLockTask.setOnClickListener {
             setKioskPolicies(true, isAdmin)
+        }
+        btnNavigate.setOnClickListener {
+            startActivity(Intent(this, SecondActivity::class.java))
+        }
+        btnStartLocationUpdates.setOnClickListener {
+            val permissionGrantState = devicePolicyManager.getPermissionGrantState(adminComponentName, packageName, Manifest.permission.ACCESS_FINE_LOCATION)
+            "permissionGrantState: $permissionGrantState".log()
+            if(permissionGrantState!=1) {
+                devicePolicyManager.setPermissionGrantState(adminComponentName, packageName, Manifest.permission.ACCESS_FINE_LOCATION, PERMISSION_GRANT_STATE_GRANTED)
+            }else{
+
+                val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,2000L,100F,object : LocationListener{
+                override fun onLocationChanged(location: Location) {
+                    locationTextView.text = "Location: ${location.latitude},${location.longitude}"
+                }
+
+            })
+            }
         }
         btStopLockTask.setOnClickListener {
             setKioskPolicies(false, isAdmin)
@@ -59,7 +112,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun isAdmin() = mDevicePolicyManager.isDeviceOwnerApp(packageName)
+    @SuppressLint("NewApi")
+    private fun showNotification() {
+
+        val id = "noty"
+        val notificationChannel = NotificationChannel(id, "Test Channel", NotificationManager.IMPORTANCE_HIGH)
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(notificationChannel)
+        val notification = Notification.Builder(this, id)
+                .setContentTitle("Test notification in kiosk mode")
+                .setContentText("this verifies that notification do infact work in kiosk mode")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .build()
+        notificationManager.notify(0, notification)
+    }
+
+    private fun isAdmin() = devicePolicyManager.isDeviceOwnerApp(packageName)
 
     private fun setKioskPolicies(enable: Boolean, isAdmin: Boolean) {
         if (isAdmin) {
@@ -78,6 +146,8 @@ class MainActivity : AppCompatActivity() {
     private fun setRestrictions(disallow: Boolean) {
         setUserRestriction(UserManager.DISALLOW_SAFE_BOOT, disallow)
         setUserRestriction(UserManager.DISALLOW_FACTORY_RESET, disallow)
+        setUserRestriction(UserManager.DISALLOW_UNINSTALL_APPS, disallow)
+        setUserRestriction(UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES, disallow)
         setUserRestriction(UserManager.DISALLOW_ADD_USER, disallow)
         setUserRestriction(UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA, disallow)
         setUserRestriction(UserManager.DISALLOW_ADJUST_VOLUME, disallow)
@@ -85,39 +155,38 @@ class MainActivity : AppCompatActivity() {
         setUserRestriction(UserManager.DISALLOW_AIRPLANE_MODE, disallow)
         setUserRestriction(UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS, disallow)
         setUserRestriction(UserManager.DISALLOW_UNINSTALL_APPS, disallow)
-        mDevicePolicyManager.setStatusBarDisabled(mAdminComponentName, false)
+        devicePolicyManager.setStatusBarDisabled(adminComponentName, false)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            mDevicePolicyManager.setLockTaskFeatures(
-                    mAdminComponentName,
-                    DevicePolicyManager.LOCK_TASK_FEATURE_HOME or
-                            DevicePolicyManager.LOCK_TASK_FEATURE_OVERVIEW or
-                            DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or DevicePolicyManager.LOCK_TASK_FEATURE_SYSTEM_INFO)
+
+            devicePolicyManager.setLockTaskFeatures(
+                    adminComponentName,
+                    DevicePolicyManager.LOCK_TASK_FEATURE_NOTIFICATIONS or DevicePolicyManager.LOCK_TASK_FEATURE_HOME)
         }
 
     }
 
     private fun setUserRestriction(restriction: String, disallow: Boolean) = if (disallow) {
-        mDevicePolicyManager.addUserRestriction(mAdminComponentName, restriction)
+        devicePolicyManager.addUserRestriction(adminComponentName, restriction)
     } else {
-        mDevicePolicyManager.clearUserRestriction(mAdminComponentName, restriction)
+        devicePolicyManager.clearUserRestriction(adminComponentName, restriction)
     }
     // endregion
 
     private fun enableStayOnWhilePluggedIn(active: Boolean) = if (active) {
-        mDevicePolicyManager.setGlobalSetting(mAdminComponentName,
+        devicePolicyManager.setGlobalSetting(adminComponentName,
                 Settings.Global.STAY_ON_WHILE_PLUGGED_IN,
                 (BatteryManager.BATTERY_PLUGGED_AC
                         or BatteryManager.BATTERY_PLUGGED_USB
                         or BatteryManager.BATTERY_PLUGGED_WIRELESS).toString())
     } else {
-        mDevicePolicyManager.setGlobalSetting(mAdminComponentName, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, "0")
+        devicePolicyManager.setGlobalSetting(adminComponentName, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, "0")
     }
 
     private fun setLockTask(start: Boolean, isAdmin: Boolean) {
         if (isAdmin) {
-            mDevicePolicyManager.setLockTaskPackages(
-                    mAdminComponentName, if (start) arrayOf(packageName,"com.mrugas.smallapp") else arrayOf())
+            devicePolicyManager.setLockTaskPackages(
+                    adminComponentName, if (start) arrayOf(packageName, "com.mrugas.smallapp") else arrayOf())
         }
         if (start) {
             startLockTask()
@@ -128,10 +197,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun setUpdatePolicy(enable: Boolean) {
         if (enable) {
-            mDevicePolicyManager.setSystemUpdatePolicy(mAdminComponentName,
+            devicePolicyManager.setSystemUpdatePolicy(adminComponentName,
                     SystemUpdatePolicy.createWindowedInstallPolicy(60, 120))
         } else {
-            mDevicePolicyManager.setSystemUpdatePolicy(mAdminComponentName, null)
+            devicePolicyManager.setSystemUpdatePolicy(adminComponentName, null)
         }
     }
 
@@ -141,16 +210,16 @@ class MainActivity : AppCompatActivity() {
                 addCategory(Intent.CATEGORY_HOME)
                 addCategory(Intent.CATEGORY_DEFAULT)
             }
-            mDevicePolicyManager.addPersistentPreferredActivity(
-                    mAdminComponentName, intentFilter, ComponentName(packageName, MainActivity::class.java.name))
+            devicePolicyManager.addPersistentPreferredActivity(
+                    adminComponentName, intentFilter, ComponentName(packageName, MainActivity::class.java.name))
         } else {
-            mDevicePolicyManager.clearPackagePersistentPreferredActivities(
-                    mAdminComponentName, packageName)
+            devicePolicyManager.clearPackagePersistentPreferredActivities(
+                    adminComponentName, packageName)
         }
     }
 
     private fun setKeyGuardEnabled(enable: Boolean) {
-        mDevicePolicyManager.setKeyguardDisabled(mAdminComponentName, !enable)
+        devicePolicyManager.setKeyguardDisabled(adminComponentName, !enable)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

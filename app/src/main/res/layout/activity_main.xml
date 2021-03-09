@@ -7,6 +7,17 @@
     tools:context="pl.snowdog.kiosk.MainActivity">
 
     <TextView
+        android:id="@+id/locationTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Location:"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.492"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="@dimen/text_margin"
@@ -45,4 +56,31 @@
         app:layout_constraintEnd_toEndOf="@id/btStopLockTask"
         app:layout_constraintStart_toStartOf="@id/btStartLockTask"
         app:layout_constraintTop_toBottomOf="@id/btStartLockTask" />
+
+    <Button
+        android:id="@+id/btnShowNotification"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Show Notification"
+        app:layout_constraintEnd_toEndOf="@id/btStopLockTask"
+        app:layout_constraintStart_toStartOf="@id/btStartLockTask"
+        app:layout_constraintTop_toBottomOf="@+id/btInstallApp" />
+
+    <Button
+        android:id="@+id/btnNavigate"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Navigate to second activity"
+        app:layout_constraintEnd_toEndOf="@id/btStopLockTask"
+        app:layout_constraintStart_toStartOf="@id/btStartLockTask"
+        app:layout_constraintTop_toBottomOf="@+id/btnShowNotification" />
+
+    <Button
+        android:id="@+id/btnStartLocationUpdates"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Start Location Updates"
+        app:layout_constraintEnd_toEndOf="@id/btStopLockTask"
+        app:layout_constraintStart_toStartOf="@id/btStartLockTask"
+        app:layout_constraintTop_toBottomOf="@+id/btnNavigate" />
 </android.support.constraint.ConstraintLayout>
