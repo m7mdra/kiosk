@@ -12,6 +12,8 @@ import android.app.admin.SystemUpdatePolicy
 import android.content.*
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageInstaller.SessionParams
+import android.content.pm.PackageManager
+import android.content.pm.PackageManager.MATCH_UNINSTALLED_PACKAGES
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -22,7 +24,6 @@ import android.os.UserManager
 import android.provider.Settings
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
-import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
 import android.widget.Toast
@@ -30,22 +31,6 @@ import kotlinx.android.synthetic.main.activity_main.*
 
 
 class MainActivity : AppCompatActivity() {
-    inner class BatteryBroadcastReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context?, batteryStatus: Intent?) {
-            val status: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-            val isCharging: Boolean = status == BatteryManager.BATTERY_STATUS_CHARGING
-                    || status == BatteryManager.BATTERY_STATUS_FULL
-
-
-            val chargePlug: Int = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
-            val usbCharge: Boolean = chargePlug == BatteryManager.BATTERY_PLUGGED_USB
-            val acCharge: Boolean = chargePlug == BatteryManager.BATTERY_PLUGGED_AC
-            print("Status: $status")
-            print("isCharging?: $isCharging ")
-
-        }
-
-    }
 
     private lateinit var adminComponentName: ComponentName
     private lateinit var devicePolicyManager: DevicePolicyManager
@@ -66,7 +51,6 @@ class MainActivity : AppCompatActivity() {
         adminComponentName = MyDeviceAdminReceiver.getComponentName(this)
         devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
 
-        devicePolicyManager.removeActiveAdmin(adminComponentName)
 
         val isAdmin = isAdmin()
         if (isAdmin) {
@@ -86,17 +70,17 @@ class MainActivity : AppCompatActivity() {
         btnStartLocationUpdates.setOnClickListener {
             val permissionGrantState = devicePolicyManager.getPermissionGrantState(adminComponentName, packageName, Manifest.permission.ACCESS_FINE_LOCATION)
             "permissionGrantState: $permissionGrantState".log()
-            if(permissionGrantState!=1) {
+            if (permissionGrantState != 1) {
                 devicePolicyManager.setPermissionGrantState(adminComponentName, packageName, Manifest.permission.ACCESS_FINE_LOCATION, PERMISSION_GRANT_STATE_GRANTED)
-            }else{
+            } else {
 
                 val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,2000L,100F,object : LocationListener{
-                override fun onLocationChanged(location: Location) {
-                    locationTextView.text = "Location: ${location.latitude},${location.longitude}"
-                }
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 100F, object : LocationListener {
+                    override fun onLocationChanged(location: Location) {
+                        locationTextView.text = "Location: ${location.latitude},${location.longitude}"
+                    }
 
-            })
+                })
             }
         }
         btStopLockTask.setOnClickListener {
@@ -145,6 +129,7 @@ class MainActivity : AppCompatActivity() {
     // region restrictions
     private fun setRestrictions(disallow: Boolean) {
         setUserRestriction(UserManager.DISALLOW_SAFE_BOOT, disallow)
+
         setUserRestriction(UserManager.DISALLOW_FACTORY_RESET, disallow)
         setUserRestriction(UserManager.DISALLOW_UNINSTALL_APPS, disallow)
         setUserRestriction(UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES, disallow)
@@ -222,9 +207,6 @@ class MainActivity : AppCompatActivity() {
         devicePolicyManager.setKeyguardDisabled(adminComponentName, !enable)
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        return false
-    }
 
     private fun setImmersiveMode(enable: Boolean) {
         if (enable) {
